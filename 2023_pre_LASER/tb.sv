@@ -1,8 +1,8 @@
 `timescale 1ns/10ps
-`define CYCLE      8.0  
+`define CYCLE      8.0
 `define SDFFILE    "./LASER_syn.sdf"
 `define MAX_CYCLE_PER_PATTERN  50000
-//`define USECOLOR 
+//`define USECOLOR
 //`define P1
 
 
@@ -42,7 +42,7 @@ always begin #(`CYCLE/2) CLK = ~CLK; end
 
 initial begin
    $fsdbDumpfile("LASER.fsdb");
-   $fsdbDumpvars();
+   $fsdbDumpvars(0, "+all");
    $fsdbDumpMDA;
 end
 
@@ -152,7 +152,7 @@ always @(posedge CLK ) begin
                 #1 RST <= 1'b0;
                 rst_count <=0;
                 state <=ST_PATTERN;
-            end 
+            end
             else begin
                 #1 RST <= 1'b1;
                 rst_count <= rst_count+1;
@@ -167,7 +167,7 @@ always @(posedge CLK ) begin
             end
         end
         ST_PATTERN: begin
-            if(DONE == 0) begin 
+            if(DONE == 0) begin
                 if (pixel_count < 40) begin
                     #1;
                     pixel_count <= pixel_count +1;
@@ -200,7 +200,7 @@ always @(posedge CLK ) begin
             end
         end
         ST_RUN: begin
-            if(DONE == 0) begin 
+            if(DONE == 0) begin
                 cycle_pat<=cycle_pat+1;
                 if (cycle_pat > `MAX_CYCLE_PER_PATTERN) begin
                     $display("== PATTERN %s",PAT[pat_n]);
