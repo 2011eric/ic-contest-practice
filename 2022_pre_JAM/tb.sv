@@ -1,17 +1,17 @@
 `timescale 1ns/10ps
-`define CYCLE      10.0  
+`define CYCLE      10.0
 `define SDFFILE    "./JAM_syn.sdf"
 `define End_CYCLE  10000000
 `define PAT        "cost_rom"
 
 `ifdef P1
-    `define PAT_NUM 1 
+    `define PAT_NUM 1
 `elsif P2
-    `define PAT_NUM 2 
+    `define PAT_NUM 2
 `elsif P3
-    `define PAT_NUM 3 
+    `define PAT_NUM 3
 `else
-    `define PAT_NUM 1 
+    `define PAT_NUM 1
 `endif
 
 
@@ -61,8 +61,8 @@ initial begin
     $display("*******************************");
     $display("** Simulation Start          **");
     $display("*******************************");
-    @(posedge CLK);  #2 RST = 1'b1; 
-    #(`CYCLE*2);  
+    @(posedge CLK);  #2 RST = 1'b1;
+    #(`CYCLE*2);
     @(posedge CLK);  #2  RST = 1'b0;
 end
 
@@ -104,18 +104,18 @@ initial begin
                     if(patnum == `PAT_NUM) begin
                         $display("PATTERN: %3d",patnum);
                     end
-             end 
+             end
              else begin
                  if(patnum == `PAT_NUM) begin
                      freturn = $sscanf(line,"%s %d",key,key_value);
                      if(key == "min_cost") begin
                          //$display ("%s: %3d",key,key_value);
                          goldMinCost = key_value;
-                     end 
+                     end
                      else if(key == "match_count") begin
                          //$display ("%s: %3d",key,key_value);
                          goldMatchCount = key_value;
-                     end 
+                     end
                      else  begin
                          freturn = $sscanf(line,"%d %d %d %d %d %d %d %d",v0,v1,v2,v3,v4,v5,v6,v7);
                          if (freturn == 0 ) $display("unknow line: -%s-",line);
@@ -156,8 +156,8 @@ reg [2:0] W_s;
 reg [2:0] J_s;
 assign Cost=costrom[8*W_s+J_s];
 always @(posedge CLK ) begin
-    W_s <=  #1 W;
-    J_s <=  #1 J;
+    W_s <= #1 W;
+    J_s <= #1 J;
 end
 
 always @(posedge CLK ) begin
