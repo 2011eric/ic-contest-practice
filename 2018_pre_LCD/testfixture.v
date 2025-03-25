@@ -54,9 +54,9 @@ reg   [3:0]   cmd_mem   [0:CMD_N_PAT-1];
 
 
 
-	LCD_CTRL LCD_CTRL(.clk(clk), .reset(reset), 
-		     .cmd(cmd), .cmd_valid(cmd_valid), 
-                     .IROM_rd(IROM_rd), .IROM_A(IROM_A), .IROM_Q(IROM_Q), 
+	LCD_CTRL LCD_CTRL(.clk(clk), .reset(reset),
+		     .cmd(cmd), .cmd_valid(cmd_valid),
+                     .IROM_rd(IROM_rd), .IROM_A(IROM_A), .IROM_Q(IROM_Q),
                      .IRAM_valid(IRAM_valid), .IRAM_D(IRAM_D), .IRAM_A(IRAM_A),
 		     .busy(busy), .done(done));
 
@@ -77,7 +77,7 @@ initial	$readmemh (`EXPECT, out_mem);
 initial begin
 
 $fsdbDumpfile("LCD_CTRL.fsdb");
-$fsdbDumpvars;
+$fsdbDumpvars(0, "+all");
 $fsdbDumpMDA;
 end
 
@@ -90,7 +90,7 @@ initial begin
    reset       = 1'b0;
    over	       = 1'b0;
    l	       = 0;
-   err         = 0;   
+   err         = 0;
 end
 
 always begin #(`CYCLE/2) clk = ~clk; end
@@ -98,22 +98,22 @@ always begin #(`CYCLE/2) clk = ~clk; end
 initial begin
    @(negedge clk)  reset = 1'b1;
    #t_reset        reset = 1'b0;
-                                  
-end  
 
-            
+end
+
+
  always @(negedge clk)
 begin
 
 	begin
 	if (l < CMD_N_PAT)
 	begin
-		if(!busy) 
+		if(!busy)
 		begin
         	cmd = cmd_mem[l];
         	cmd_valid = 1'b1;
 		l=l+1;
-		end  
+		end
 		else
 		cmd_valid = 1'b0;
 	end
@@ -126,10 +126,10 @@ begin
 end
 
 
-initial @(posedge done) 
+initial @(posedge done)
 begin
    for(k=0;k<64;k=k+1)begin
-         if( IRAM_1.IRAM_M[k] !== out_mem[k]) 
+         if( IRAM_1.IRAM_M[k] !== out_mem[k])
 		begin
          	$display("ERROR at %d:output %h !=expect %h ",k, IRAM_1.IRAM_M[k], out_mem[k]);
          	err = err+1 ;
@@ -138,7 +138,7 @@ begin
                 begin
                 $display("ERROR at %d:output %h !=expect %h ",k, IRAM_1.IRAM_M[k], out_mem[k]);
 		err=err+1;
-                end   
+                end
  over=1'b1;
 end
         begin
@@ -148,12 +148,12 @@ end
 		    #10 $finish;
 	         end
 	         else if( over===1'b1 )
-		 begin 
+		 begin
 	            $display("There are %d errors!\n", err);
 	            $display("---------------------------------------------\n");
 		    #10 $finish;
          	 end
-	
+
 	end
 end
 
@@ -177,9 +177,9 @@ initial begin
 	@ (negedge reset) $readmemb (`IMAGE , sti_M);
 	end
 
-always@(negedge clk) 
+always@(negedge clk)
 	if (IROM_rd) IROM_data <= sti_M[IROM_addr];
-	
+
 endmodule
 
 
@@ -200,7 +200,7 @@ initial begin
 	for (i=0; i<=63; i=i+1) IRAM_M[i] = 0;
 end
 
-always@(negedge clk) 
+always@(negedge clk)
 	if (IRAM_valid) IRAM_M[ IRAM_addr ] <= IRAM_data;
 
 endmodule
