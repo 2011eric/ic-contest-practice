@@ -9,158 +9,175 @@ output reg       match      ;
 output reg [4:0] match_index;
 output reg 		 valid      ;
 
-reg       cr_state, nt_state  ;
-reg [6:0] str_buffer [31:0]   ;
-reg [5:0] str_len             ;
-reg [5:0] str_counter		  ;
-reg [6:0] pat_buffer [7:0]    ;
-reg [3:0] pat_len             ;
-reg [3:0] pat_counter         ;
 
-reg flag, str_flag    ;    // First match and first string check.
-reg match_back        ;    // Use to control whether str_counter plus, if dot not match, don't plus. 
-reg [3:0] star_index  ;    // Store postion if star appear , if no star in pattern it will be zero.
+localparam STR_WIDTH = 32;
+localparam PAT_WIDTH = 8;
 
-parameter   READ_STRING_PATTERN  = 1'd0 ,			
-			STRING_MATCH         = 1'd1 ; 
+localparam WORD_START = 8'h5E;
+localparam WORD_END   = 8'h24;
+localparam WORD_ANY   = 8'h2E;
+localparam WORD_SPACE = 8'h20;
 
-always @(posedge clk or posedge reset) begin
 
-	if (reset) begin
-		match       <= 1'b0 ;
-		match_index <= 5'd0 ;
-		valid       <= 1'b0 ;
-		str_len     <= 6'd0 ;
-		str_counter <= 6'd0 ;
-		pat_len     <= 4'd0 ;
-		pat_counter <= 4'd0 ;
-		flag        <= 1'b1 ;
-		match_back  <= 1'b0 ;
-		star_index  <= 4'd0 ;
-		str_flag    <= 1'b1 ;
-		cr_state    <= READ_STRING_PATTERN ;
-	end
 
-	else begin
+typedef enum logic [2:0] {
+	IDLE,
+    INPUT_STR,
+	INPUT_PAT,
+    MATCH
+} state_e;
 
-		cr_state <= nt_state;
+typedef logic [7:0] char_t;
 
-		case(cr_state)
+// output registers
+logic valid_r, valid_w;
+logic match_r, match_w;
+logic [4:0] match_index_r, match_index_w;
 
-			READ_STRING_PATTERN:begin
-				valid  <= 1'b0 ;
-				flag   <= 1'b0 ;
-				if(isstring) begin     					          // Read String
-					str_len <= str_len + 6'd1;
-					if(!str_flag) begin
-						str_buffer[0] <= chardata;
-						str_len <= 6'd1;
-						str_flag <= 1'b1;
-					end
-					else str_buffer[str_len] <= chardata;
-				end
+assign valid = valid_r;
+assign match = match_r;
+assign match_index = match_index_r;
 
-				if(ispattern) begin    					          // Read Pattern
-					pat_buffer[pat_len] <= chardata;
-					pat_len <= pat_len + 4'd1;
-					if(chardata==8'd94 || chardata==8'd36)begin   // If charactor is $ or ^ , use a space to replace it. 
-						pat_buffer[pat_len] <= 8'd32 ;	
-						pat_counter <= 4'd1 ;  // If now is first position, don't add space to it. 
-					end
-					else begin
-						pat_buffer[pat_len] <= chardata;
-					end
-				end
+
+// registers
+state_e state_r, state_w;
+
+char_t string_r [0:STR_WIDTH+1], string_w [0:STR_WIDTH+1];
+char_t pattern_r [0:PAT_WIDTH-1], pattern_w [0:PAT_WIDTH-1];
+
+logic [$clog2(PAT_WIDTH):0]     pat_cnt_r, pat_cnt_w;
+logic [$clog2(STR_WIDTH+2):0]   str_cnt_r, str_cnt_w;
+
+logic [$clog2(STR_WIDTH+2)-1:0]   s_cnt_r, s_cnt_w;
+logic [$clog2(PAT_WIDTH)-1:0]     p_cnt_r, p_cnt_w;
+
+
+always_comb begin : state_logic
+    state_w = state_r;
+    valid_w = 0;
+    match_w = match_r;
+    match_index_w = match_index_r;
+
+    string_w  = string_r;
+    pattern_w = pattern_r;
+
+    str_cnt_w = str_cnt_r;
+    pat_cnt_w = pat_cnt_r;
+
+    s_cnt_w = s_cnt_r;
+    p_cnt_w = p_cnt_r;
+
+    unique case(state_r)
+		IDLE: begin
+			if (isstring) begin
+				str_cnt_w  = 2;
+				string_w[1] = chardata;
+				state_w = INPUT_STR;
+			end else if (ispattern) begin
+				pat_cnt_w = 1;
+				pattern_w[0] = chardata;
+				state_w = INPUT_PAT;
 			end
-
-			STRING_MATCH:begin
-
-				if(ispattern) begin    					          // Read Pattern
-					pat_buffer[pat_len] <= chardata;
-					pat_len <= pat_len + 4'd1;
-					if(chardata==8'd94 || chardata==8'd36)begin   // If charactor is $ or ^ , use a space to replace it. 
-						pat_buffer[pat_len] <= 8'd32 ;	
-					end
-					else begin
-						pat_buffer[pat_len] <= chardata;
-					end
-				end
-
-				case(pat_buffer[pat_counter])
-
-					8'd42:begin  // *
-						pat_counter <= (str_buffer[str_counter] == pat_buffer[pat_counter+1])?  pat_counter + 4'd1 : pat_counter ;
-						str_counter <= !(str_buffer[str_counter] == pat_buffer[pat_counter+1])? str_counter + 6'd1 : str_counter ;
-						star_index <= pat_counter;
-						if(!flag) begin  					// First match
-							match_index <= str_counter;
-							flag        <= 1'b1;
-						end	
-					end
-
-					8'd46:begin  // .
-						if( (pat_buffer[pat_counter]==8'd46) && pat_counter==0) match_back <= 1;
-						str_counter <= str_counter + 6'd1 ;
-						pat_counter <= pat_counter + 4'd1 ;
-						if(!flag) begin  					// First match
-							match_index <= str_counter;
-							flag        <= 1'b1;
-						end	
-					end
-
-					default:begin
-						if(str_buffer[str_counter] == pat_buffer[pat_counter])begin
-							str_counter <= str_counter + 6'd1 ;
-							pat_counter <= pat_counter + 4'd1 ;
-							if(!flag && str_buffer[str_counter]!=8'd32) begin  					// First match
-								match_index <= str_counter;
-								flag        <= 1'b1;
-							end	
-						end
-						else begin
-							pat_counter <= star_index;
-							if(!star_index) flag        <= 1'b0;
-							if(!match_back) str_counter <= str_counter + 6'd1;
-						end	
-					end
-
-				endcase			
-
-				// Termination condition
-				// special case is "$" in pattern last character, because use space replace it, it needs to special treatment.
-				if((pat_counter==pat_len) || (str_counter==str_len) || ( (pat_counter==pat_len-1) && (str_counter==str_len) ) )begin
-					match 		<= ( pat_counter==pat_len || ( (pat_counter==pat_len-1) && (str_counter==str_len) ) )? 1'b1 : 1'b0;
-					pat_counter <= 4'd0 ;
-					pat_len     <= 4'd0 ;
-					str_counter <= 6'd0 ;
-					str_flag    <= 1'b0 ;
-					flag        <= 1'b1 ;
-					match_back  <= 1'b0 ;
-					star_index  <= 4'd0 ;
-					valid       <= 1'b1 ;
-				end
+		end
+        INPUT_STR: begin
+            if (isstring) begin
+                str_cnt_w = str_cnt_r + 1;
+                string_w[str_cnt_r] = chardata;
+                state_w = INPUT_STR;
+			end else if (ispattern) begin
+				state_w = INPUT_PAT;
+                string_w[str_cnt_r] = WORD_SPACE;
+                str_cnt_w = str_cnt_r + 1;
+                pat_cnt_w = 1;
+				pattern_w[0] = chardata;
 			end
+        end
+		INPUT_PAT: begin
+			if (ispattern) begin
+				pattern_w[pat_cnt_r] = chardata;
+                pat_cnt_w = pat_cnt_r + 1;
+			end else begin
+				state_w = MATCH;
+                s_cnt_w = 0;
+                p_cnt_w = 0;
+			end
+		end
+        MATCH: begin
+			p_cnt_w = p_cnt_r + 1;
+            if(pattern_r[p_cnt_r] == WORD_START || pattern_r[p_cnt_r] == WORD_END) begin
+                match_w = match_r && (string_r[s_cnt_r+p_cnt_r] == WORD_SPACE);
+            end else if(pattern_r[p_cnt_r] != WORD_ANY) begin
+                match_w = match_r && (string_r[s_cnt_r+p_cnt_r] == pattern_r[p_cnt_r]);
+            end
 
-		endcase
-		
-	end
+            if(p_cnt_r == pat_cnt_r -1) begin
+                p_cnt_w = 0;
+                s_cnt_w = s_cnt_r + 1;
+
+                if(match_w) begin
+                    state_w = IDLE;
+                    valid_w = 1;
+                    match_index_w = s_cnt_r - (pattern_r[0] != WORD_START && s_cnt_r != 0);
+                end else begin
+                    match_w = 1;
+                end
+
+
+                if(s_cnt_r == str_cnt_r - pat_cnt_r + 2) begin
+                    // NO MATCH
+                    state_w = IDLE;
+                    valid_w = 1;
+                    match_w = 0;
+                end
+            end
+
+        end
+    endcase
 end
 
 
-always@(*)begin   //Next state logic
-	
-	case(cr_state)
 
-		READ_STRING_PATTERN:begin
-			nt_state = (pat_len==4'd1)? STRING_MATCH : READ_STRING_PATTERN;
-		end
 
-		STRING_MATCH:begin
-			nt_state = ( (pat_counter==pat_len) || (str_counter==str_len) || ( (pat_counter==pat_len-1)&& (str_counter==str_len) ) )? READ_STRING_PATTERN : STRING_MATCH;
-		end
 
-	endcase
 
+
+
+
+
+
+
+
+
+
+
+
+
+always_ff @(posedge clk or posedge reset) begin
+	if (reset) begin
+		state_r <= IDLE;
+		match_r <= 0;
+		match_index_r <= 0;
+        valid_r <= 0;
+
+        pat_cnt_r <= 0;
+        str_cnt_r <= 0;
+        string_r  <= '{default: WORD_SPACE};
+        pattern_r <= '{default: WORD_SPACE};
+        s_cnt_r <= 0;
+        p_cnt_r <= 0;
+	end else begin
+        state_r <= state_w;
+		match_r <= match_w;
+		match_index_r <= match_index_w;
+        valid_r <= valid_w;
+
+        pat_cnt_r <= pat_cnt_w;
+        str_cnt_r <= str_cnt_w;
+        string_r  <= string_w;
+        pattern_r <= pattern_w;
+        s_cnt_r <= s_cnt_w;
+        p_cnt_r <= p_cnt_w;
+	end
 end
 
 endmodule
